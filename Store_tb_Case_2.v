@@ -1,0 +1,142 @@
+`timescale 1ns / 1ns
+module Store_tb_Case_2;
+
+  reg Zout, Rout, HIout, LOout, Zhighout, Zlowout, 
+      PCout, MDRout, InPortout, OutPortIn, Cout;    
+  reg MARin, Zin, PCin, MDRin, IRin, Yin;
+  reg Gra, Grb, Grc, Rin, CONin, CONread;
+  reg Read, IncPC, HIin, LOin, ZhighIn, ZlowIn, BAout, IRout;
+  reg clock, clear;
+  reg R0out, R1out, R2out, R3out, R4out, R5out, R6out, R7out, R8out, R9out, 
+    R10out, R11out, R12out, R13out, R14out, R15out;
+	reg we;
+
+  // State encoding
+  parameter Default = 4'b0000, T0 = 4'b0001, T1a = 4'b0010, T1b = 4'b0011,
+            T2a = 4'b0100, T2b = 4'b0101, T3a = 4'b0110, T3b = 4'b0111, T4 = 4'b1000, T5 = 4'b1001, T6 = 4'b1010;
+  reg [3:0] Present_state = Default;
+
+  // Instantiate DataPath modules
+  DataPath DUT (
+    clock, clear, Gra, Grb, Grc,
+	 Rout, HIout, LOout, Zhighout, Zlowout, PCout, MDRout, InPortout, OutPortIn, Cout,
+	 Yin, Rin, PCin, IRin, HIin, LOin, MARin, MDRin, Read, ZhighIn, ZlowIn, BAout, IncPC, we, CONin, CONread
+  );
+
+  // Clock generation
+  initial begin
+    clock = 0;
+    clear = 0;
+    forever #10 clock = ~clock;
+  end
+
+  // State transition logic
+  always @(posedge clock) begin
+    if (clear)
+      Present_state <= Default;
+    else begin
+      case (Present_state)
+        Default: Present_state <= T0;
+        T0: Present_state <= T1a;
+        T1a: Present_state <= T1b;
+        T1b: Present_state <= T2a;
+        T2a: Present_state <= T2b;
+		  T2b: Present_state <= T3a;
+        T3a: Present_state <= T3b;
+		  T3b: Present_state <= T4;
+        T4: Present_state <= T5;
+		  T5: Present_state <= T6;
+      endcase
+    end
+  end
+  
+  always @(Present_state) begin
+    case(Present_state)
+      Default: begin
+		  Rout<=0; HIout<=0; LOout<=0; Zhighout<=0; Zlowout<=0; 
+		  PCout<=0; MDRout<=0; InPortout<=0; Cout<=0;    
+		  MARin<=0; Zin<=0; PCin<=0; MDRin<=0; IRin<=0; Yin<=0;
+		  Gra<=0; Grb<=0; Grc<=0; Rin<=0;
+		  Read<=0; IncPC<=0; HIin<=0; LOin<=0; ZhighIn<=0; ZlowIn<=0; BAout<=0;
+		  CONin<=0; CONread<=0; OutPortIn<=0; we<=0;
+        DUT.PC1.q = 32'h00000000; 
+		  force DUT.bus.BusMuxInInPort = 32'h00000000;
+		  DUT.R3.q = 32'h000000B6;
+
+
+      end
+
+      // Load instruction address into MAR
+      T0: begin
+         PCout <= 1; IncPC<=1; PCin <= 1;
+		   ZlowIn<=1; MARin <= 1;
+      end
+
+      // Read instruction into MDR
+      T1a: begin
+         PCout <= 0; IncPC<=0; PCin <= 0;
+			ZlowIn<=0; MARin <= 0;
+			Read <= 1; Zlowout <= 1;
+      end 
+
+      T1b: begin
+         MDRin <= 1; 
+      end
+
+      // Move instruction from MDR to IR
+      T2a: begin
+        MDRin <= 0; Read <= 0; Zlowout <= 0; PCin <= 0;
+        MDRout <= 1;
+      end
+		
+		T2b: begin
+        IRin <= 1;
+      end
+
+      T3a: begin
+        IRin <= 0;
+		  MDRout <= 0; 
+		  
+        BAout <= 1; Grb <= 1; Yin <= 1; Rout <= 1;  
+      end
+		
+		T3b: begin
+			Grb <=0;
+			force DUT.opcode = 5'b00011;
+        Gra <= 1;
+		  MDRin <= 1; 
+
+      end
+
+
+      T4: begin
+        MDRin <= 0; BAout <= 0; Gra <= 0; Yin <= 0; Rout <= 0;
+		  
+        Cout <= 1; ZlowIn <= 1;  
+      end
+
+      // Move value from MDR to R4
+      T5: begin
+		  ZlowIn <= 0;  Cout <= 0; 
+		  
+			Zlowout <=1; MARin <= 1; 
+			end
+			
+		T6:begin 
+		
+			Zlowout <= 0; MARin <= 0;
+			we <= 1;
+		  
+      end
+    endcase
+  end
+
+endmodule
+
+
+
+
+
+
+
+
